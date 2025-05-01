@@ -13,17 +13,33 @@ function SketchCanvas({ onAdd }: { onAdd: (canvas: HTMLCanvasElement) => void })
     ctx.strokeStyle = "black";
   }, []);
 
-  const handleMouseDown = () => (drawing.current = true);
-  const handleMouseUp = () => {
+  const startDrawing = () => (drawing.current = true);
+  const stopDrawing = () => {
     drawing.current = false;
+    const ctx = canvasRef.current?.getContext("2d");
+    ctx?.beginPath(); // Reset path
   };
-  const handleMouseMove = (e: React.MouseEvent) => {
+
+  const draw = (x: number, y: number) => {
     if (!drawing.current || !canvasRef.current) return;
     const ctx = canvasRef.current.getContext("2d")!;
-    ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+    ctx.lineTo(x, y);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+    ctx.moveTo(x, y);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    draw(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    draw(x, y);
   };
 
   const handleAddSketch = () => {
@@ -31,7 +47,7 @@ function SketchCanvas({ onAdd }: { onAdd: (canvas: HTMLCanvasElement) => void })
     onAdd(canvasRef.current);
     const ctx = canvasRef.current.getContext("2d")!;
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    ctx.beginPath(); // Reset drawing state
+    ctx.beginPath();
   };
 
   return (
@@ -40,11 +56,15 @@ function SketchCanvas({ onAdd }: { onAdd: (canvas: HTMLCanvasElement) => void })
         ref={canvasRef}
         width={256}
         height={256}
-        style={{ border: "1px solid black", display: "block" }}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseOut={handleMouseUp}
+        style={{ border: "1px solid black", display: "block", touchAction: "none" }}
+        onMouseDown={startDrawing}
+        onMouseUp={stopDrawing}
+        onMouseOut={stopDrawing}
         onMouseMove={handleMouseMove}
+        onTouchStart={startDrawing}
+        onTouchEnd={stopDrawing}
+        onTouchCancel={stopDrawing}
+        onTouchMove={handleTouchMove}
       />
       <button type="button" onClick={handleAddSketch} style={{ marginTop: "0.5rem" }}>
         Add Sketch
