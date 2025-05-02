@@ -4,25 +4,35 @@ import "./App.css";
 function SketchCanvas({ onAdd }: { onAdd: (canvas: HTMLCanvasElement) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
+  const [brushSize, setBrushSize] = useState(4);
+  const brushSizeRef = useRef(brushSize);
+
+  useEffect(() => {
+    brushSizeRef.current = brushSize; // ✅ Sync state to ref
+  }, [brushSize]);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = brushSize;
     ctx.lineCap = "round";
     ctx.strokeStyle = "black";
   }, []);
 
-  const startDrawing = () => (drawing.current = true);
+  const startDrawing = () => {
+    drawing.current = true;
+  };
+
   const stopDrawing = () => {
     drawing.current = false;
     const ctx = canvasRef.current?.getContext("2d");
-    ctx?.beginPath(); // Reset path
+    ctx?.beginPath(); // reset path
   };
 
   const draw = (x: number, y: number) => {
     if (!drawing.current || !canvasRef.current) return;
     const ctx = canvasRef.current.getContext("2d")!;
+    ctx.lineWidth = brushSizeRef.current;
     ctx.lineTo(x, y);
     ctx.stroke();
     ctx.beginPath();
@@ -44,33 +54,40 @@ function SketchCanvas({ onAdd }: { onAdd: (canvas: HTMLCanvasElement) => void })
 
   const handleAddSketch = () => {
     if (!canvasRef.current) return;
-  
+
     const clone = document.createElement("canvas");
     clone.width = canvasRef.current.width;
     clone.height = canvasRef.current.height;
     const ctxClone = clone.getContext("2d")!;
     ctxClone.drawImage(canvasRef.current, 0, 0);
-  
+
     // Save as base64 in localStorage
     const dataUrl = clone.toDataURL("image/png");
     const stored = JSON.parse(localStorage.getItem("sketches") || "[]");
     stored.push(dataUrl);
     localStorage.setItem("sketches", JSON.stringify(stored));
-  
-    onAdd(clone); // Add to UI
-  
+
+    onAdd(clone);
+
     const ctx = canvasRef.current.getContext("2d")!;
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     ctx.beginPath();
   };
 
   return (
-    <div style={{ marginBottom: "1rem" }}>
+    <div style={{ marginBottom: "1rem", textAlign: "center" }}>
       <canvas
         ref={canvasRef}
-        width={256}
-        height={256}
-        style={{ border: "1px solid black", display: "block", touchAction: "none" }}
+        width={768}
+        height={1024}
+        style={{
+          border: "1px solid black",
+          display: "block",
+          margin: "0 auto",
+          touchAction: "none",
+          maxWidth: "100%",
+          height: "auto",
+        }}
         onMouseDown={startDrawing}
         onMouseUp={stopDrawing}
         onMouseOut={stopDrawing}
@@ -80,6 +97,28 @@ function SketchCanvas({ onAdd }: { onAdd: (canvas: HTMLCanvasElement) => void })
         onTouchCancel={stopDrawing}
         onTouchMove={handleTouchMove}
       />
+      <div style={{ margin: "1rem 0", textAlign: "center" }}>
+        <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1rem" }}>
+          <span>Brush Size: {brushSize}</span>
+          <input
+            type="range"
+            min={1}
+            max={30}
+            value={brushSize}
+            onChange={(e) => setBrushSize(Number(e.target.value))}
+          />
+          <span
+            style={{
+              width: `${brushSize}px`,
+              height: `${brushSize}px`,
+              borderRadius: "50%",
+              backgroundColor: "black",
+              display: "inline-block",
+              border: "1px solid #999",
+            }}
+          />
+        </label>
+      </div>
       <button type="button" onClick={handleAddSketch} style={{ marginTop: "0.5rem" }}>
         Add Sketch
       </button>
@@ -103,6 +142,7 @@ export default function VideoGenerator() {
   const [guidanceIndex, setGuidanceIndex] = useState(0);
   const [otherViewsIndex, setOtherViewsIndex] = useState(0);
   const [showVideo, setShowVideo] = useState(false);
+  const [showSketchModal, setShowSketchModal] = useState(false);
 
   const BASE_URL = "https://8000-01jqemr6zft7pf7d6mj4h3j4n1.cloudspaces.litng.ai";
 
@@ -400,9 +440,9 @@ export default function VideoGenerator() {
         {activeTab === "sketch" && (
           <>
             <p>Draw sketches of your desired car:</p>
-            <SketchCanvas onAdd={(canvas) => {
-              setSketches(prev => [...prev, canvas]);
-            }} />
+            <button type="button" onClick={() => setShowSketchModal(true)}>
+              Open Sketch Canvas
+            </button>
             {sketches.length > 0 && (
           <div style={{ marginTop: "1rem" }}>
             <h4>Sketch Previews:</h4>
@@ -445,19 +485,19 @@ export default function VideoGenerator() {
         </div>
       )}
 
-      {showVideo && videoUrl && (
-        <div
-          className="modal-overlay"
-          onClick={() => setShowVideo(false)}
-        >
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <video src={videoUrl} controls autoPlay loop style={{ width: "100%" }} />
-            <div style={{ marginTop: "1rem", textAlign: "right" }}>
-              <button onClick={() => setShowVideo(false)}>Close</button>
-            </div>
+    {showVideo && videoUrl && (
+      <div
+        className="modal-overlay"
+        onClick={() => setShowVideo(false)}
+      >
+        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <video src={videoUrl} controls autoPlay loop style={{ width: "100%" }} />
+          <div style={{ marginTop: "1rem", textAlign: "right" }}>
+            <button onClick={() => setShowVideo(false)}>Close</button>
           </div>
         </div>
-      )}
+      </div>
+    )}
       {videoUrl && (
         <div style={{ marginTop: "1rem" }}>
           <button
@@ -479,6 +519,24 @@ export default function VideoGenerator() {
           </button>
         </div>
       )}
+      {showSketchModal && (
+  <div className="modal-overlay" onClick={() => setShowSketchModal(false)}>
+    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      <SketchCanvas
+        onAdd={(canvas) => {
+          setSketches((prev) => [...prev, canvas]);
+
+          const dataUrl = canvas.toDataURL("image/png");
+          const stored = JSON.parse(localStorage.getItem("sketches") || "[]");
+          localStorage.setItem("sketches", JSON.stringify([...stored, dataUrl]));
+        }}
+      />
+      <button onClick={() => setShowSketchModal(false)} style={{ marginTop: "1rem" }}>
+        Close
+      </button>
+    </div>
+  </div>
+)}
     </div>
   );
 }
