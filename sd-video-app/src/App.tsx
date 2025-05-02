@@ -78,8 +78,8 @@ function SketchCanvas({ onAdd }: { onAdd: (canvas: HTMLCanvasElement) => void })
     <div style={{ marginBottom: "1rem", textAlign: "center" }}>
       <canvas
         ref={canvasRef}
-        width={1024}
-        height={768}
+        width={512}
+        height={512}
         style={{
           border: "1px solid black",
           display: "block",
